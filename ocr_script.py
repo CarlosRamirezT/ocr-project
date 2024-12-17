@@ -3,6 +3,8 @@ import re
 from pypdf import PdfReader
 import pdfplumber
 from datetime import datetime
+import pandas as pd
+import openpyxl
 
 OPERATION_OPTIONS = {
     1: "Convert PDF to Excel"
@@ -18,10 +20,10 @@ def execute():
         print(f'{option}: {description}')
     print()
     
-    # operation_option = input("Option: ")
+    operation_option = input("Option: ")
 
-    # if operation_option == "1":
-        # execute_convert_pdf_to_excel()
+    if operation_option == "1":
+        execute_convert_pdf_to_excel()
 
 def execute_convert_pdf_to_excel():
     file_paths = _get_files_to_convert()
@@ -32,6 +34,7 @@ def execute_convert_pdf_to_excel():
         # get data depending on file type and bank
         file_data = _get_file_data(file)
         # write data to excel
+        _write_data_to_excel(file_path, file_data)
         
 def _get_files_to_convert(path=False):
     current_path = os.getcwd()
@@ -122,10 +125,18 @@ def _get_file_data(file):
             except Exception as e:
                 print(f'error on line: idx: {i}: {line}')
                 raise e
-    return file_data['lines']
+    return file_data
+
+def _write_data_to_excel(file_path, file_data):
+    # write data to excel
+    output_path = "/".join(file_path.split('/')[:-2])
+    file_name = file_path.split("/")[-1].split(".")[-2]
+    output_file_path = output_path + f"/{file_name}.xlsx"
+    df = pd.DataFrame(file_data['lines'])
+    df.to_excel(output_file_path, index=False, engine="openpyxl")
 
 
-# if __name__ == "__main__":
-#     execute()
+if __name__ == "__main__":
+    execute()
 
 

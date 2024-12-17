@@ -28,33 +28,11 @@ def execute_convert_pdf_to_excel():
     output_mode = _get_output_mode()
 
     for file_path in file_paths:
-        file_path = "/Users/cadara/Documents/CONTABILIDAD Y FINANZAS PERSONALES/Estados de Cuenta 2024 BSC/802840-2024-11-13-to-2024-12-13_241217_104523.pdf"
         file = pdfplumber.open(file_path)
-        file_clean_data= list()
-        for page in file.pages:
-            page_text = page.extract_text()
-            lines = page_text.splitlines()
-
-            statement_date = datetime.strptime(lines[4].replace('FECHA DE CORTE: ', ''), '%d/%m/%Y').date()
-
-            for i, line in enumerate(lines[19:]):
-                # if last line of the page, break
-                if 'PUNTOS GANADOS PDUNTOS' in line:
-                    break
-                try:
-                    file_clean_data.append(
-                        {
-                            'transaction_date': datetime.strptime(line.split(' ')[0], '%d/%m').date().replace(year=statement_date.year),
-                            'account_date': datetime.strptime(line.split(' ')[1], '%d/%m').date().replace(year=statement_date.year),
-                            'description': line[12:].split(' * ')[0],
-                            'amount': float(line[12:].split(' * ')[1].replace(',', ''))
-                        }
-                    )
-                except Exception as e:
-                    print(f'error on line idx: {i}')
-                    raise e
-
-    
+        # get data depending on file type and bank
+        file_data = _get_file_data(file)
+        # write data to excel
+        
 def _get_files_to_convert(path=False):
     current_path = os.getcwd()
     parent_path = os.path.dirname(current_path)
@@ -108,6 +86,43 @@ def _get_output_mode():
         output_mode = 'multiple_files'
 
     return output_mode
+
+def _get_file_data(file):
+    
+    file_data = dict()
+    file_data['lines'] = list()
+
+    for page in file.pages:
+        page_text = page.extract_text()
+        lines = page_text.splitlines()
+
+        statement_date = datetime.strptime(lines[4].replace('FECHA DE CORTE: ', ''), '%d/%m/%Y').date()
+
+        file_data['statement_date'] = statement_date
+        file_data['product_name'] = lines[1].split(": ")[1]
+        file_data['product_number'] = lines[2].split(": ")[1]
+        file_data['customer_name'] = lines[3].split(": ")[1]
+
+        for i, line in enumerate(lines[19:]):
+            # if last line of the page, break
+            if 'PUNTOS GANADOS PDUNTOS' in line:
+                break
+            if line[2] != "/":
+                continue
+
+            try:
+                file_data['lines'].append(
+                    {
+                        'transaction_date': datetime.strptime(line.split(' ')[0], '%d/%m').date().replace(year=statement_date.year),
+                        'account_date': datetime.strptime(line.split(' ')[1], '%d/%m').date().replace(year=statement_date.year),
+                        'description': line[12:].split(' * ')[0],
+                        'amount': float(line[12:].split(' * ')[1].replace(',', ''))
+                    }
+                )
+            except Exception as e:
+                print(f'error on line: idx: {i}: {line}')
+                raise e
+    return file_data['lines']
 
 
 # if __name__ == "__main__":

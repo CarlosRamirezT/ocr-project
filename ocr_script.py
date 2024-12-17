@@ -1,5 +1,7 @@
 import os
+import re
 from pypdf import PdfReader
+import pdfplumber
 from datetime import datetime
 
 OPERATION_OPTIONS = {
@@ -27,61 +29,30 @@ def execute_convert_pdf_to_excel():
 
     for file_path in file_paths:
         file_path = "/Users/cadara/Documents/CONTABILIDAD Y FINANZAS PERSONALES/Estados de Cuenta 2024 BSC/802840-2024-11-13-to-2024-12-13_241217_104523.pdf"
-        file_reader = PdfReader(file_path)
+        file = pdfplumber.open(file_path)
         file_clean_data= list()
-        for page in file_reader.pages:
-
-            page_clean_data = list()
-
+        for page in file.pages:
             page_text = page.extract_text()
             lines = page_text.splitlines()
 
-            statement_date = datetime.strptime(lines[15].replace('FECHA DE CORTE: ', ''), '%d/%m/%Y').date()
+            statement_date = datetime.strptime(lines[4].replace('FECHA DE CORTE: ', ''), '%d/%m/%Y').date()
 
-            date_strings = list()
-            description_strings = list()
-            amount_strings = list()
-
-            for line in lines[85:]:
-                # end of data reached, break
-                if "TITULAR" in line:
+            for i, line in enumerate(lines[19:]):
+                # if last line of the page, break
+                if 'PUNTOS GANADOS PDUNTOS' in line:
                     break
-                
-                # for date lines
-                if "/" in line and len(line) >= 4 and len(line) <= 5:
-                    date_strings.append(line)
-
-                # for amount lines
-                elif line[0] == " " and "." in line:
-                    amount_strings.append(line)
-
-                # for description lines
-                else:
-                    description_strings.append(line)
-
-            # clean page data
-
-            lines_real_qty = len(description_strings)
-            transaction_date_strings = date_strings[:lines_real_qty]
-            account_date_strings = date_strings[lines_real_qty:]
-
-            for transaction_date, account_date, description, amount in zip(
-                transaction_date_strings, 
-                account_date_strings, 
-                description_strings, 
-                amount_strings
-            ):
-                current_date = statement_date
-                page_clean_data.append(
-                    {
-                        'transaction_date': datetime.strptime(transaction_date, '%d/%m').date().replace(year=current_date.year),
-                        'account_date': datetime.strptime(account_date, '%d/%m').date().replace(year=current_date.year),
-                        'description': description.replace(' * ', '').rstrip(),
-                        'amount': float(amount.replace(' ', '').replace(',', ''))
-                    }
-                )
-
-
+                try:
+                    file_clean_data.append(
+                        {
+                            'transaction_date': datetime.strptime(line.split(' ')[0], '%d/%m').date().replace(year=statement_date.year),
+                            'account_date': datetime.strptime(line.split(' ')[1], '%d/%m').date().replace(year=statement_date.year),
+                            'description': line[12:].split(' * ')[0],
+                            'amount': float(line[12:].split(' * ')[1].replace(',', ''))
+                        }
+                    )
+                except Exception as e:
+                    print(f'error on line idx: {i}')
+                    raise e
 
     
 def _get_files_to_convert(path=False):
@@ -139,7 +110,7 @@ def _get_output_mode():
     return output_mode
 
 
-if __name__ == "__main__":
-    execute()
+# if __name__ == "__main__":
+#     execute()
 
 
